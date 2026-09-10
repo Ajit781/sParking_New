@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_dashboard"
+            android:checked="true"
+            android:icon="@drawable/ic_dashboard"
+            android:title="Dashboard" />
+
+        <item
+            android:id="@+id/nav_check_in"
+            android:icon="@drawable/ic_directions_car"
+            android:title="Vehicle Check-In" />
+
+        <item
+            android:id="@+id/nav_rates"
+            android:icon="@drawable/ic_rate"
+            android:title="Parking Rates" />
+
+        <item
+            android:id="@+id/nav_terminal"
+            android:icon="@drawable/ic_terminal"
+            android:title="Terminal &amp; Device" />
+    </group>
+
+    <item android:title="Session">
+        <menu>
+            <item
+                android:id="@+id/nav_logout"
+                android:icon="@drawable/ic_logout"
+                android:title="Logout" />
+        </menu>
+    </item>
+
+</menu>

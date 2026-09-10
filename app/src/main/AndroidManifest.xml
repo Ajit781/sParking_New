@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="com.pax.permission.ICC" />
+    <uses-permission android:name="com.pax.permission.PICC" />
+    <uses-permission android:name="com.pax.permission.MAGCARD" />
+    <uses-permission android:name="com.pax.permission.PRINTER" />
+    <uses-permission android:name="com.pax.permission.PED" />
+
+    <queries>
+        <package android:name="com.ezetap.service" />
+        <package android:name="com.ezetap.smartpos" />
+        <package android:name="com.pinelabs.masterapp" />
+        <package android:name="com.razorpay.pos" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+        </intent>
+    </queries>
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
+
+    <application
+        android:name=".SParkingApp"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SParkingNew"
+        tools:targetApi="31">
+
+        <!-- Splash Screen Launcher Activity -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Splash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Login Screen -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false" />
+
+        <!-- Main Dashboard / Screen -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
+
+        <!-- Vehicle Check-In Screen -->
+        <activity
+            android:name=".CheckInActivity"
+            android:exported="false" />
+
+        <!-- Unregistered Vehicle Registration & Check-In Screen -->
+        <activity
+            android:name=".UnregisteredVehicleActivity"
+            android:exported="false" />
+
+        <!-- Camera OCR Vehicle Plate & Text Scanner Screen -->
+        <activity
+            android:name=".scanner.VehicleScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
+
+    </application>
+
+</manifest>

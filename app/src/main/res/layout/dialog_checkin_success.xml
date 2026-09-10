@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_rounded"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingTop="26dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="24dp">
+
+    <!-- Glowing Success Icon Badge -->
+    <FrameLayout
+        android:layout_width="68dp"
+        android:layout_height="68dp"
+        android:background="@drawable/bg_success_icon_circle">
+
+        <ImageView
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_gravity="center"
+            android:contentDescription="Success Icon"
+            android:src="@drawable/ic_check"
+            app:tint="#16A34A" />
+    </FrameLayout>
+
+    <!-- Dialog Title -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:fontFamily="sans-serif-black"
+        android:letterSpacing="0.01"
+        android:text="Check-In Successful"
+        android:textColor="#0F172A"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- Subtitle -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:text="Vehicle registered &amp; parked in lot"
+        android:textColor="#64748B"
+        android:textSize="13sp" />
+
+    <!-- Vehicle Number Plate Capsule -->
+    <TextView
+        android:id="@+id/tv_checkin_dialog_vehicle_no"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_pill_input"
+        android:fontFamily="sans-serif-black"
+        android:letterSpacing="0.06"
+        android:paddingStart="18dp"
+        android:paddingTop="7dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="7dp"
+        android:text="WB 02 AB 1234"
+        android:textColor="#0F172A"
+        android:textSize="16sp" />
+
+    <!-- Details Card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_receipt_summary_card"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- Row 1: Booking No & Assigned Slot -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:text="Booking Number"
+                    android:textColor="#64748B"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tv_checkin_dialog_booking_no"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="BK-102938"
+                    android:textColor="#0F172A"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:text="Assigned Slot"
+                    android:textColor="#64748B"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tv_checkin_dialog_slot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="General"
+                    android:textColor="#16A34A"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="10dp"
+            android:background="#E2E8F0" />
+
+        <!-- Row 2: Check-In Time & Vehicle Type -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.2"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:text="Check-In Time"
+                    android:textColor="#64748B"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tv_checkin_dialog_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="Today, 09:30 AM"
+                    android:textColor="#0F172A"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.8"
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:text="Vehicle Type"
+                    android:textColor="#64748B"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tv_checkin_dialog_type"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="Four Wheeler"
+                    android:textColor="#0F172A"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Action Buttons Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:orientation="vertical">
+
+        <!-- Print Ticket Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_print_checkin_ticket"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:backgroundTint="@color/primary"
+            android:elevation="3dp"
+            android:fontFamily="sans-serif-bold"
+            android:letterSpacing="0.02"
+            android:text="🖨️   Print Entry Ticket"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="14.5sp"
+            app:cornerRadius="14dp" />
+
+        <!-- Done / OK Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_done_checkin"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:fontFamily="sans-serif-bold"
+            android:text="Done / Close"
+            android:textAllCaps="false"
+            android:textColor="#64748B"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+</LinearLayout>

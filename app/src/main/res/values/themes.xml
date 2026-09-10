@@ -1,0 +1,24 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.SParkingNew" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Status bar matching rich navy appbar with white icons -->
+        <item name="android:statusBarColor">#0F172A</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+
+    <style name="Theme.SParkingNew" parent="Base.Theme.SParkingNew" />
+
+    <!-- Dedicated Splash Theme to prevent white preview flash on cold launch -->
+    <style name="Theme.Splash" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/bg_splash_dark_luxury</item>
+        <item name="android:statusBarColor">#030712</item>
+        <item name="android:navigationBarColor">#030712</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+
+    <style name="DrawerItemTextAppearance" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:textSize">15sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">#1E293B</item>
+    </style>
+</resources>
