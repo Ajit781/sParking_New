@@ -79,8 +79,14 @@ public final class PosPaymentManager {
             return;
         }
 
+        com.innovus.sparkingnew.devices.DeviceInterface device = com.innovus.sparkingnew.devices.DeviceFactory.getDevice(activity);
+        if (device instanceof com.innovus.sparkingnew.devices.PineLabsDevice) {
+            initiatePineLabsPayment(activity, amount, bookingNo, paymentModeId, callback);
+            return;
+        }
+
         if (amount <= 0) {
-            Log.e(TAG, "Invalid payment amount: " + amount);
+            Log.e(TAG, "Invalid payment amount:" + amount);
             if (callback != null) {
                 callback.onPaymentFailed("INVALID_AMOUNT", "Payment amount must be greater than zero");
             }
@@ -144,6 +150,119 @@ public final class PosPaymentManager {
             if (callback != null) {
                 callback.onPaymentFailed("SDK_ERROR", "Error invoking POS payment: " + t.getMessage());
             }
+        }
+    }
+
+    private static void initiatePineLabsPayment(Activity activity,
+                                                double amount,
+                                                String bookingNo,
+                                                int paymentModeId,
+                                                PaymentCallback callback) {
+        Intent intent = new Intent();
+        intent.setAction("com.pinelabs.masterapp.SERVER");
+        intent.setPackage("com.pinelabs.masterapp");
+
+        final android.content.ServiceConnection[] connectionHolder = new android.content.ServiceConnection[1];
+
+        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper()) {
+            @Override
+            public void handleMessage(android.os.Message msg) {
+                super.handleMessage(msg);
+                
+                if (connectionHolder[0] != null) {
+                    try {
+                        activity.unbindService(connectionHolder[0]);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Error unbinding PineLabs service: " + e.getMessage());
+                    }
+                    connectionHolder[0] = null;
+                }
+
+                android.os.Bundle bundle = msg.getData();
+                if (bundle != null) {
+                    String rawResponse = bundle.getString("MASTERAPPRESPONSE");
+                    Log.i(TAG, "PineLabs Payment Response: " + rawResponse);
+                    
+                    try {
+                        JSONObject responseObj = new JSONObject(rawResponse != null ? rawResponse : "{}");
+                        JSONObject resultObj = responseObj.optJSONObject("Response");
+                        if (resultObj != null) {
+                            int responseCode = resultObj.optInt("ResponseCode", -1);
+                            String responseMsg = resultObj.optString("ResponseMsg", "");
+
+                            if (responseCode == 0) {
+                                String txnId = "TXN_" + System.currentTimeMillis(); 
+                                if (callback != null) callback.onPaymentSuccess(txnId, rawResponse);
+                            } else if (responseCode == 7) {
+                                if (callback != null) callback.onPaymentCancelled(String.valueOf(responseCode), responseMsg);
+                            } else {
+                                if (callback != null) callback.onPaymentFailed(String.valueOf(responseCode), responseMsg);
+                            }
+                        } else {
+                            if (callback != null) callback.onPaymentFailed("UNKNOWN", "Missing Response in JSON");
+                        }
+                    } catch (Exception e) {
+                        if (callback != null) callback.onPaymentFailed("PARSE_ERROR", e.getMessage());
+                    }
+                }
+            }
+        };
+
+        connectionHolder[0] = new android.content.ServiceConnection() {
+            @Override
+            public void onServiceConnected(android.content.ComponentName name, android.os.IBinder service) {
+                android.os.Messenger mService = new android.os.Messenger(service);
+                try {
+                    JSONObject printRequest = new JSONObject();
+                    JSONObject header = new JSONObject();
+                    header.put("ApplicationId", "8754f022bd7f475a9f29284a656d3401");
+                    header.put("UserId", "user1234");
+                    header.put("MethodId", "1001");
+                    header.put("VersionNo", "1.0");
+                    printRequest.put("Header", header);
+
+                    JSONObject detail = new JSONObject();
+                    if (paymentModeId == PAYMENT_MODE_CARD) {
+                        detail.put("TransactionType", "4001");
+                    } else if (paymentModeId == PAYMENT_MODE_UPI) {
+                        detail.put("TransactionType", "5123");
+                    } else {
+                        detail.put("TransactionType", "4001");
+                    }
+
+                    detail.put("BillingRefNo", bookingNo != null ? bookingNo : "TXN" + System.currentTimeMillis());
+                    
+                    long amountInPaisa = Math.round(amount * 100.0);
+                    detail.put("PaymentAmount", String.valueOf(amountInPaisa));
+
+                    printRequest.put("Detail", detail);
+
+                    android.os.Message message = android.os.Message.obtain(null, 1001); 
+                    android.os.Bundle data = new android.os.Bundle();
+                    data.putString("MASTERAPPREQUEST", printRequest.toString());
+                    message.setData(data);
+                    message.replyTo = new android.os.Messenger(handler);
+
+                    Log.i(TAG, "Sending PineLabs Payment Request: " + printRequest.toString());
+                    mService.send(message);
+
+                } catch (Exception e) {
+                    if (callback != null) callback.onPaymentFailed("ERROR", e.getMessage());
+                    try {
+                        activity.unbindService(this);
+                        connectionHolder[0] = null;
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            @Override
+            public void onServiceDisconnected(android.content.ComponentName name) {
+            }
+        };
+
+        boolean bindResult = activity.bindService(intent, connectionHolder[0], android.content.Context.BIND_AUTO_CREATE);
+        if (!bindResult) {
+            if (callback != null) callback.onPaymentFailed("BIND_ERROR", "Failed to bind PineLabs MasterApp");
         }
     }
 

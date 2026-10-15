@@ -10,12 +10,15 @@ import org.json.JSONObject;
 /**
  * Centralized Crypto and Payload Security Manager for sParking.
  *
- * Seamlessly manages Staging (plain stringified enc_data) vs Production (real AES cipher enc_data)
- * so that business logic and UI activities remain completely decoupled from encryption mechanisms.
+ * Staging vs Production:
+ * - STAGING: Sends plain real data payload (no AES encryption).
+ * - PRODUCTION: Automatically encrypts and decrypts payloads via AES-256-GCM.
+ *
+ * NOTE: Sensitive real data is NEVER printed to Android logs. Only status and ciphers are logged.
  */
 public final class CryptoManager {
 
-    private static final String TAG = "CryptoManager";
+    private static final String TAG = "sParking_API";
     public static final String KEY_ENC_DATA = "enc_data";
 
     private CryptoManager() {
@@ -24,12 +27,8 @@ public final class CryptoManager {
 
     /**
      * Prepares the outbound HTTP JSON request payload.
-     * In Staging: Wraps inner JSON string in {"enc_data": "{\"field\":\"value\"}"}.
-     * In Production: Encrypts inner JSON using AES and wraps in {"enc_data": "<base64_ciphertext>"}.
-     *
-     * @param innerJson Inner business data JSONObject
-     * @return Complete JSON payload string ready for transmission
-     * @throws Exception if encryption fails
+     * In Staging: Sends plain real data in enc_data: {"enc_data": "{\"field\":\"value\"}"}.
+     * In Production: Encrypts inner JSON using AES-256-GCM and wraps in {"enc_data": "<base64_ciphertext>"}.
      */
     public static String prepareEncryptedPayload(JSONObject innerJson) throws Exception {
         if (innerJson == null) {
@@ -39,23 +38,25 @@ public final class CryptoManager {
         JSONObject outerObj = new JSONObject();
 
         if (ApiConfig.isEncryptionEnabled()) {
-            // PRODUCTION MODE: Real AES encryption
-            Log.d(TAG, "[ENCRYPT] Production encryption active. Encrypting payload via AES-CBC...");
+            // PRODUCTION MODE: Real AES-256-GCM encryption
             String plainText = innerJson.toString();
             String cipherText = AesCipherUtil.encrypt(plainText);
             outerObj.put(KEY_ENC_DATA, cipherText);
-            Log.d(TAG, "[ENCRYPT] Payload successfully encrypted into AES Base64 cipher.");
+
+            Log.i(TAG, "🔒 [CryptoManager:ENCRYPT] PRODUCTION MODE (AES-256-GCM) - Encrypted payload generated");
+            Log.i(TAG, "📤 Encrypted Cipher (On-The-Wire): " + cipherText);
         } else {
-            // STAGING / DEBUG MODE: Plain stringified inner JSON
-            Log.d(TAG, "[STAGING] Plain enc_data wrapping active (staging mode).");
+            // STAGING MODE: Plain real data payload
             outerObj.put(KEY_ENC_DATA, innerJson.toString());
+
+            Log.i(TAG, "🧪 [CryptoManager:STAGING] STAGING MODE - Outbound payload prepared (Plain enc_data)");
         }
 
         return outerObj.toString();
     }
 
     /**
-     * Prepares an empty request payload for endpoints that require an empty JSON body.
+     * Prepares an empty request payload.
      */
     public static String prepareEmptyPayload() throws Exception {
         return prepareEncryptedPayload(new JSONObject());
@@ -64,15 +65,8 @@ public final class CryptoManager {
     /**
      * Decrypts and parses the raw server response body into a clean JSONObject.
      *
-     * If Encryption is Enabled:
-     *  - Automatically identifies and decrypts "enc_data" or encrypted "data" fields.
-     *  - Handles fully encrypted responses transparently.
-     * If Staging Mode:
-     *  - Parses and returns the standard response directly.
-     *
-     * @param rawResponse Raw HTTP response string from server
-     * @return Parsed (and decrypted if applicable) JSONObject
-     * @throws Exception if parsing or decryption fails
+     * In Staging: Parses and returns the standard response directly without decryption.
+     * In Production: Decrypts AES-256-GCM encrypted "enc_data" or "data" fields without exposing plaintext in logs.
      */
     public static JSONObject decryptResponse(String rawResponse) throws Exception {
         if (rawResponse == null || rawResponse.trim().isEmpty()) {
@@ -85,19 +79,20 @@ public final class CryptoManager {
         if (trimmed.startsWith("{")) {
             JSONObject responseJson = new JSONObject(trimmed);
 
-            // If encryption is not enabled, return standard response as-is
+            // STAGING MODE: Return standard response as-is (no decryption required)
             if (!ApiConfig.isEncryptionEnabled()) {
+                Log.i(TAG, "🧪 [CryptoManager:DECRYPT] STAGING MODE - Response processed directly.");
                 return responseJson;
             }
 
-            // In Production: Check if "enc_data" exists and needs decryption
+            // PRODUCTION MODE: Decrypt "enc_data" if present
             if (responseJson.has(KEY_ENC_DATA)) {
                 String encData = responseJson.optString(KEY_ENC_DATA, "");
                 if (!encData.isEmpty() && !encData.startsWith("{") && !encData.startsWith("[")) {
-                    Log.d(TAG, "[DECRYPT] Decrypting 'enc_data' cipher text...");
+                    Log.i(TAG, "🔒 [CryptoManager:DECRYPT] Decrypting 'enc_data' cipher via AES-256-GCM...");
                     try {
                         String decrypted = AesCipherUtil.decrypt(encData);
-                        Log.d(TAG, "[DECRYPT] Decryption successful.");
+                        Log.i(TAG, "🔓 [CryptoManager:DECRYPT] 'enc_data' decrypted successfully.");
 
                         if (decrypted.trim().startsWith("{")) {
                             return new JSONObject(decrypted);
@@ -105,19 +100,19 @@ public final class CryptoManager {
                             responseJson.put("decrypted_data", decrypted);
                         }
                     } catch (Exception e) {
-                        Log.w(TAG, "[DECRYPT] Could not decrypt 'enc_data' (might be plain server error): " + e.getMessage());
+                        Log.w(TAG, "⚠️ [CryptoManager:DECRYPT] Could not decrypt 'enc_data': " + e.getMessage());
                     }
                 }
             }
 
-            // Check if "data" field contains encrypted Base64 cipher text
+            // PRODUCTION MODE: Decrypt "data" field if it contains Base64 cipher text
             if (responseJson.has("data")) {
                 String dataStr = responseJson.optString("data", "");
-                // If data is a cipher string (not raw JSON object or array)
                 if (!dataStr.isEmpty() && !dataStr.equals("null")
                         && !dataStr.startsWith("{") && !dataStr.startsWith("[")) {
                     try {
                         String decryptedData = AesCipherUtil.decrypt(dataStr);
+                        Log.i(TAG, "🔓 [CryptoManager:DECRYPT] 'data' cipher decrypted successfully via AES-256-GCM.");
                         if (decryptedData.startsWith("{")) {
                             responseJson.put("data", new JSONObject(decryptedData));
                         } else if (decryptedData.startsWith("[")) {
@@ -125,10 +120,8 @@ public final class CryptoManager {
                         } else {
                             responseJson.put("data", decryptedData);
                         }
-                        Log.d(TAG, "[DECRYPT] 'data' payload decrypted successfully.");
                     } catch (Exception e) {
-                        // Fallback: It may already be a plain string (e.g. error message)
-                        Log.w(TAG, "[DECRYPT] 'data' was not encrypted or decryption skipped: " + e.getMessage());
+                        Log.w(TAG, "⚠️ [CryptoManager:DECRYPT] 'data' decryption skipped/plain: " + e.getMessage());
                     }
                 }
             }
@@ -138,8 +131,9 @@ public final class CryptoManager {
 
         // If the entire HTTP body itself is a raw encrypted Base64 string
         if (ApiConfig.isEncryptionEnabled()) {
-            Log.d(TAG, "[DECRYPT] Raw response body appears to be fully encrypted. Decrypting...");
+            Log.i(TAG, "🔒 [CryptoManager:DECRYPT] Entire response body is encrypted cipher. Decrypting via AES-256-GCM...");
             String decryptedStr = AesCipherUtil.decrypt(trimmed);
+            Log.i(TAG, "🔓 [CryptoManager:DECRYPT] Response body decrypted successfully.");
             if (decryptedStr.trim().startsWith("{")) {
                 return new JSONObject(decryptedStr);
             } else {

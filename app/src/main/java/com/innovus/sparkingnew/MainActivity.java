@@ -98,6 +98,9 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
     private RecyclerView rvParkedVehicles;
     private ExtendedFloatingActionButton fabCheckIn;
 
+    // Flag to track if user explicitly requested full list
+    private boolean isFullListRequested = false;
+
     // Data & Services
     private SessionManager sessionManager;
     private TokenManager tokenManager;
@@ -172,9 +175,7 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
             Log.i(TAG, "Request Code: 10001");
             Log.i(TAG, "App Mode: " + jsonRequest.optString("appMode"));
             Log.i(TAG, "Merchant Name: " + jsonRequest.optString("merchantName"));
-            Log.i(TAG, "User Name: " + jsonRequest.optString("userName"));
-            Log.i(TAG, "App Key: " + (jsonRequest.has("demoAppKey") ? jsonRequest.optString("demoAppKey") : jsonRequest.optString("prodAppKey")));
-            Log.i(TAG, "Full JSON Payload:\n" + jsonRequest.toString(2));
+            Log.i(TAG, "EzeAPI initialized successfully.");
             Log.i(TAG, "======================================================================");
 
             EzeAPI.initialize(this, 10001, jsonRequest);
@@ -273,8 +274,6 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
         // Drawer Header Views (Original UI)
         if (navigationView != null && navigationView.getHeaderCount() > 0) {
             View headerView = navigationView.getHeaderView(0);
-            tvDrawerAvatarInitials = headerView.findViewById(R.id.tv_drawer_avatar_initials);
-            tvDrawerAgentName = headerView.findViewById(R.id.tv_drawer_agent_name);
             tvDrawerAgentIdAgency = headerView.findViewById(R.id.tv_drawer_agent_id_agency);
             tvDrawerLocation = headerView.findViewById(R.id.tv_drawer_location);
             tvDrawerTerminal = headerView.findViewById(R.id.tv_drawer_terminal);
@@ -292,7 +291,10 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
 
         // Refresh vehicle list button
         if (btnRefresh != null) {
-            btnRefresh.setOnClickListener(v -> loadVehicles());
+            btnRefresh.setOnClickListener(v -> {
+                isFullListRequested = true;
+                loadVehicles();
+            });
         }
     }
 
@@ -373,16 +375,13 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
                 }
             }
 
-            // Populate Navigation Drawer Header (Original UI)
-            if (tvDrawerAgentName != null) {
-                tvDrawerAgentName.setText(name);
-            }
+            // Populate Navigation Drawer Header
+
             if (tvDrawerAgentIdAgency != null) {
-                String idPart = agentId > 0 ? "Agent ID: " + agentId : "";
-                if (!idPart.isEmpty() && !agency.isEmpty()) {
-                    tvDrawerAgentIdAgency.setText(idPart + " • " + agency);
+                if (agency != null && !agency.isEmpty()) {
+                    tvDrawerAgentIdAgency.setText(agency);
                 } else {
-                    tvDrawerAgentIdAgency.setText(!idPart.isEmpty() ? idPart : agency);
+                    tvDrawerAgentIdAgency.setText("");
                 }
             }
             if (tvDrawerLocation != null) {
@@ -393,11 +392,12 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
                 }
             }
             if (tvDrawerTerminal != null) {
-                String devIdStr = currentUser.getDeviceId() > 0 ? " (ID: " + currentUser.getDeviceId() + ")" : "";
+                String devIdStr = currentUser.getDeviceId() > 0 ? String.valueOf(currentUser.getDeviceId()) : "";
                 String uidInfo = (currentUser.getDeviceUid() != null && !currentUser.getDeviceUid().isEmpty())
-                        ? " [" + currentUser.getDeviceUid() + "]"
+                        ? currentUser.getDeviceUid()
                         : "";
-                tvDrawerTerminal.setText("Terminal: " + deviceDisplay + devIdStr + uidInfo);
+                String finalTid = !uidInfo.isEmpty() ? uidInfo : (!devIdStr.isEmpty() ? devIdStr : "N/A");
+                tvDrawerTerminal.setText("TID: " + finalTid);
             }
             if (tvDrawerRates != null) {
                 tvDrawerRates.setText(String.format(Locale.getDefault(), "Rates: 2W ₹%.0f  |  4W ₹%.0f", twoWheelerRate, fourWheelerRate));
@@ -407,12 +407,10 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
             }
         } else {
             if (tvNavbarSubtitle != null) tvNavbarSubtitle.setText("");
-            if (tvDrawerAgentName != null) tvDrawerAgentName.setText("");
             if (tvDrawerAgentIdAgency != null) tvDrawerAgentIdAgency.setText("");
             if (tvDrawerLocation != null) tvDrawerLocation.setText("");
-            if (tvDrawerTerminal != null) tvDrawerTerminal.setText("Terminal: " + deviceDisplay);
+            if (tvDrawerTerminal != null) tvDrawerTerminal.setText("TID: N/A");
             if (tvDrawerRates != null) tvDrawerRates.setText("");
-            if (tvDrawerAvatarInitials != null) tvDrawerAvatarInitials.setText("");
         }
     }
 
@@ -531,7 +529,9 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
     private void filterVehicles(String query) {
         vehicleList.clear();
         if (query == null || query.isEmpty()) {
-            vehicleList.addAll(allVehicleList);
+            if (isFullListRequested) {
+                vehicleList.addAll(allVehicleList);
+            }
         } else {
             String lowerQuery = query.toLowerCase(Locale.getDefault());
             for (ParkedVehicle v : allVehicleList) {
@@ -1033,7 +1033,10 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
                 String location = (currentUser != null && currentUser.getLocation() != null)
                         ? currentUser.getLocation() : "sParking Station";
 
-                ReceiptPrinter.printCheckOutTicket(
+                com.innovus.sparkingnew.devices.DeviceInterface myDevice = 
+                        com.innovus.sparkingnew.devices.DeviceFactory.getDevice(MainActivity.this);
+                
+                myDevice.printCheckOutTicket(
                         MainActivity.this,
                         vehicle.getVehicleNumber(),
                         inTime,
@@ -1041,7 +1044,7 @@ public class MainActivity extends AppCompatActivity implements VehicleAdapter.On
                         vehicle.getBookingNo(),
                         vehicle.getVehicleType(),
                         location,
-                        vehicle.getSlotName(),
+                        vehicle.getSlotName() != null ? vehicle.getSlotName() : "",
                         hours,
                         rate,
                         payableAmt,

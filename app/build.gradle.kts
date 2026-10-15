@@ -7,11 +7,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.innovus.sparkingnew"
+        applicationId = "com.innovus.vyoma.s_parking_agentApollo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 999
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -20,14 +20,18 @@ android {
         }
 
         buildConfigField("String", "BASE_URL", "\"https://vigpl.com/SParkingRestAPI/api/\"")
-        // Staging commented out - Production currently uses same working endpoint
-        // buildConfigField("String", "BASE_URL_STAGING", "\"https://vigpl.com/SParkingRestAPI/api/\"")
         buildConfigField("String", "BASE_URL_PROD", "\"https://vigpl.com/SParkingRestAPI/api/\"")
-        buildConfigField("Boolean", "IS_ENCRYPTION_ENABLED", "false")
+        buildConfigField("Boolean", "IS_ENCRYPTION_ENABLED", "true")
     }
 
     buildFeatures {
         buildConfig = true
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     buildTypes {

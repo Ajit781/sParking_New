@@ -5,6 +5,7 @@ import android.app.Application;
 import android.content.Context;
 import android.util.Log;
 
+import com.innovus.sparkingnew.network.ApiConfig;
 import com.pax.dal.IDAL;
 import com.pax.neptunelite.api.NeptuneLiteUser;
 
@@ -23,6 +24,9 @@ public class SParkingApp extends Application {
         super.onCreate();
         instance = this;
         appContext = getApplicationContext();
+
+        // Initialize Dynamic API Configuration & Cache
+        ApiConfig.init(this);
 
         // Initialize PAX Neptune DAL
         getDal(this);

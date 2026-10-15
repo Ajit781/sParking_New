@@ -438,7 +438,11 @@ public class CheckInActivity extends AppCompatActivity {
             btnPrint.setOnClickListener(v -> {
                 btnPrint.setEnabled(false);
                 btnPrint.setText("Printing Ticket...");
-                ReceiptPrinter.printCheckInTicket(
+                Log.i("CheckInActivity", "Print Button Clicked - Starting print process...");
+                com.innovus.sparkingnew.devices.DeviceInterface myDevice = com.innovus.sparkingnew.devices.DeviceFactory.getDevice(CheckInActivity.this);
+                Log.i("CheckInActivity", "Using Device: " + myDevice.getClass().getSimpleName());
+                
+                myDevice.printCheckInTicket(
                         CheckInActivity.this,
                         vehicleNo,
                         finalCheckinTime,
@@ -447,6 +451,7 @@ public class CheckInActivity extends AppCompatActivity {
                         parkingLocation,
                         finalSlotName,
                         (printSuccess, statusMsg) -> {
+                            Log.i("CheckInActivity", "Print Callback received: success=" + printSuccess + ", msg=" + statusMsg);
                             runOnUiThread(() -> {
                                 Toast.makeText(CheckInActivity.this, statusMsg != null ? statusMsg : "Ticket printed", Toast.LENGTH_SHORT).show();
                                 dialog.dismiss();
@@ -487,7 +492,7 @@ public class CheckInActivity extends AppCompatActivity {
             progressNext.setVisibility(View.VISIBLE);
         } else {
             btnNext.setEnabled(true);
-            btnNext.setText("Issue Check-In Ticket");
+            btnNext.setText("NEXT");
             progressNext.setVisibility(View.GONE);
         }
     }

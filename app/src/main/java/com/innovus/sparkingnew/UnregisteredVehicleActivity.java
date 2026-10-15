@@ -140,17 +140,15 @@ public class UnregisteredVehicleActivity extends AppCompatActivity {
         etVehicleNo = findViewById(R.id.et_unreg_vehicle_no);
         spinnerVehicleType = findViewById(R.id.spinner_vehicle_type);
         progressLoadingTypes = findViewById(R.id.progress_loading_types);
-
         cardResponseStatus = findViewById(R.id.card_response_status);
         tvResponseIcon = findViewById(R.id.tv_response_icon);
         tvResponseStatusCode = findViewById(R.id.tv_response_status_code);
         tvResponseMessage = findViewById(R.id.tv_response_message);
         btnDismissResponse = findViewById(R.id.btn_dismiss_response);
-
         btnRegister = findViewById(R.id.btn_register_vehicle);
         progressRegister = findViewById(R.id.progress_register);
 
-        spinnerAdapter = new ArrayAdapter<>(this, R.layout.item_spinner_vehicle_type, vehicleTypeList);
+        spinnerAdapter = new ArrayAdapter<>(this, R.layout.item_spinner_vehicle_type_selected, vehicleTypeList);
         spinnerAdapter.setDropDownViewResource(R.layout.item_spinner_vehicle_type);
         spinnerVehicleType.setAdapter(spinnerAdapter);
     }
@@ -205,6 +203,20 @@ public class UnregisteredVehicleActivity extends AppCompatActivity {
             tilMobileNo.setError(null);
             Toast.makeText(this, "Default mobile 0000000000 applied", Toast.LENGTH_SHORT).show();
         });
+
+        View cardVehicleType = findViewById(R.id.card_vehicle_type);
+        View ivVehicleTypeDropdown = findViewById(R.id.iv_vehicle_type_dropdown);
+        View.OnClickListener openSpinnerListener = v -> {
+            if (spinnerVehicleType != null) {
+                spinnerVehicleType.performClick();
+            }
+        };
+        if (cardVehicleType != null) {
+            cardVehicleType.setOnClickListener(openSpinnerListener);
+        }
+        if (ivVehicleTypeDropdown != null) {
+            ivVehicleTypeDropdown.setOnClickListener(openSpinnerListener);
+        }
     }
 
     private void setupStatusBar() {
@@ -297,7 +309,7 @@ public class UnregisteredVehicleActivity extends AppCompatActivity {
         String enteredOwner = (etOwnerName != null && etOwnerName.getText() != null)
                 ? etOwnerName.getText().toString().trim()
                 : "";
-        String ownerName = enteredOwner;
+        String ownerName = (!enteredOwner.isEmpty()) ? enteredOwner : "12345";
 
         int finalAgentId = agentId > 0 ? agentId : 159;
         String emailId = "deep@gmail.com";
@@ -307,16 +319,8 @@ public class UnregisteredVehicleActivity extends AppCompatActivity {
         String alternateMobile = "0000000000";
 
         Log.i(TAG, "==================== [SUBMITTING UNREGISTERED CHECKIN] ====================");
-        Log.i(TAG, "Agent ID: " + finalAgentId);
-        Log.i(TAG, "Vehicle No: " + vehicleNo);
-        Log.i(TAG, "Vehicle Type ID: " + vehicleTypeId);
-        Log.i(TAG, "Owner Name: " + ownerName);
-        Log.i(TAG, "Mobile No: " + mobileNo);
-        Log.i(TAG, "Email ID: " + emailId);
-        Log.i(TAG, "Address: " + address);
-        Log.i(TAG, "Payment Mode ID: " + paymentModeId);
-        Log.i(TAG, "Alternate Mobile No: " + alternateMobile);
-        Log.i(TAG, "Inner enc_data JSON: {\"agent_id\":" + finalAgentId + ",\"vehicle_no\":\"" + vehicleNo + "\",\"vehicle_type_id\":" + vehicleTypeId + ",\"owner_name\":\"" + ownerName + "\",\"mobile_no\":\"" + mobileNo + "\",\"email_id\":\"" + emailId + "\",\"address\":\"" + address + "\",\"payment_mode_id\":" + paymentModeId + ",\"alternate_mobile_no\":\"" + alternateMobile + "\"}");
+        Log.i(TAG, "Vehicle Type ID: " + vehicleTypeId + " | Payment Mode ID: " + paymentModeId);
+        Log.i(TAG, "Submitting unregistered vehicle check-in (sensitive fields masked in logs)...");
         Log.i(TAG, "=========================================================================");
 
         BookingNetworkService.checkinUnregisteredVehicle(
@@ -334,7 +338,7 @@ public class UnregisteredVehicleActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String status, String message, String rawData, boolean isSuccess) {
                         setLoading(false);
-                        Log.i(TAG, "[UNREGISTERED CHECK-IN RESULT] Status: " + status + " | Message: " + message + " | RawData: " + rawData);
+                        Log.i(TAG, "[UNREGISTERED CHECK-IN RESULT] Status: " + status + " | Message: " + message);
 
                         showResponseBanner(isSuccess, status, message);
 
@@ -435,7 +439,11 @@ public class UnregisteredVehicleActivity extends AppCompatActivity {
             btnPrint.setOnClickListener(v -> {
                 btnPrint.setEnabled(false);
                 btnPrint.setText("Printing Ticket...");
-                ReceiptPrinter.printCheckInTicket(
+                Log.i("UnregVehicleActivity", "Print Button Clicked - Starting print process...");
+                com.innovus.sparkingnew.devices.DeviceInterface myDevice = com.innovus.sparkingnew.devices.DeviceFactory.getDevice(UnregisteredVehicleActivity.this);
+                Log.i("UnregVehicleActivity", "Using Device: " + myDevice.getClass().getSimpleName());
+                
+                myDevice.printCheckInTicket(
                         UnregisteredVehicleActivity.this,
                         vehicleNo,
                         finalCheckinTime,
@@ -444,6 +452,7 @@ public class UnregisteredVehicleActivity extends AppCompatActivity {
                         parkingLocation,
                         finalSlotName,
                         (printSuccess, statusMsg) -> {
+                            Log.i("UnregVehicleActivity", "Print Callback received: success=" + printSuccess + ", msg=" + statusMsg);
                             runOnUiThread(() -> {
                                 Toast.makeText(UnregisteredVehicleActivity.this, statusMsg != null ? statusMsg : "Ticket printed", Toast.LENGTH_SHORT).show();
                                 dialog.dismiss();

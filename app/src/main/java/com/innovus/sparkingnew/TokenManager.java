@@ -13,29 +13,45 @@ import java.util.Locale;
 
 /**
  * Centralized singleton manager for saving, accessing, and validating authentication tokens.
+ * Features thread-safe silent auto-refresh (getValidTokenSync) and reactive invalidation (invalidateToken).
  */
 public class TokenManager {
 
-    private static final String TAG = "TokenManager";
+    private static final String TAG = "sParking_API";
     private static final String PREF_NAME = "sParking_auth_prefs";
     private static final String KEY_ACCESS_TOKEN = "access_token";
     private static final String KEY_CREATED_AT = "created_at";
     private static final String KEY_EXPIRES_AT = "expires_at";
 
+    private static final Object REFRESH_LOCK = new Object();
     private static TokenManager instance;
     private final SharedPreferences prefs;
 
     // In-memory cache for fast access
     private static volatile String cachedToken = null;
 
+    public interface TokenFetchCallback {
+        void onTokenReady(String token);
+        void onError(String error);
+    }
+
     private TokenManager(Context context) {
-        prefs = context.getApplicationContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        Context ctx = context != null ? context.getApplicationContext() : SParkingApp.getAppContext();
+        prefs = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         cachedToken = prefs.getString(KEY_ACCESS_TOKEN, null);
+    }
+
+    public static synchronized TokenManager getInstance() {
+        if (instance == null) {
+            instance = new TokenManager(SParkingApp.getAppContext());
+        }
+        return instance;
     }
 
     public static synchronized TokenManager getInstance(Context context) {
         if (instance == null) {
-            instance = new TokenManager(context);
+            Context ctx = (context != null) ? context.getApplicationContext() : SParkingApp.getAppContext();
+            instance = new TokenManager(ctx);
         }
         return instance;
     }
@@ -62,6 +78,75 @@ public class TokenManager {
         }
         cachedToken = prefs.getString(KEY_ACCESS_TOKEN, null);
         return cachedToken;
+    }
+
+    /**
+     * Thread-safe method to get a guaranteed-valid token.
+     * If valid, returns immediately.
+     * If expired or missing, silently refreshes the token synchronously via AuthNetworkService.
+     * MUST be called from a background thread.
+     */
+    public String getValidTokenSync() {
+        if (isTokenValid()) {
+            return getToken();
+        }
+
+        synchronized (REFRESH_LOCK) {
+            // Double-checked locking
+            if (isTokenValid()) {
+                return getToken();
+            }
+
+            Log.i(TAG, "[SILENT TOKEN REFRESH] Token expired or missing. Fetching fresh token synchronously...");
+            AuthNetworkService.AuthResult result = AuthNetworkService.generateTokenSync();
+            if (result.isSuccess()) {
+                saveToken(result.getAccessToken(), result.getCreatedAt(), result.getExpiresAt());
+                Log.i(TAG, "[SILENT TOKEN REFRESH SUCCESS] New token saved. Valid until: " + result.getExpiresAt());
+                return result.getAccessToken();
+            } else {
+                Log.e(TAG, "[SILENT TOKEN REFRESH FAILED] " + result.getMessage());
+                return getToken(); // Return existing token as fallback
+            }
+        }
+    }
+
+    /**
+     * Asynchronously guarantees a valid token, refreshing if needed.
+     */
+    public void ensureValidToken(TokenFetchCallback callback) {
+        if (callback == null) return;
+        if (isTokenValid()) {
+            callback.onTokenReady(getToken());
+            return;
+        }
+
+        Log.i(TAG, "[ASYNC TOKEN REFRESH] Fetching fresh token asynchronously...");
+        AuthNetworkService.generateToken(new AuthNetworkService.TokenCallback() {
+            @Override
+            public void onSuccess(String accessToken, String createdAt, String expiresAt, String message) {
+                saveToken(accessToken, createdAt, expiresAt);
+                callback.onTokenReady(accessToken);
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                String existing = getToken();
+                if (existing != null && !existing.trim().isEmpty()) {
+                    callback.onTokenReady(existing);
+                } else {
+                    callback.onError(errorMessage);
+                }
+            }
+        });
+    }
+
+    /**
+     * Marks the current token as invalidated / expired (e.g. after a 401 Unauthorized from server).
+     */
+    public void invalidateToken() {
+        cachedToken = null;
+        prefs.edit().remove(KEY_ACCESS_TOKEN).remove(KEY_EXPIRES_AT).apply();
+        Log.i(TAG, "Token explicitly invalidated.");
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.innovus.sparkingnew;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -9,9 +10,9 @@ import android.view.View;
 import android.view.animation.OvershootInterpolator;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -20,17 +21,26 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.google.android.material.button.MaterialButton;
+import com.innovus.sparkingnew.network.ApiConfig;
+import com.innovus.sparkingnew.network.VersionCheckService;
 import com.innovus.sparkingnew.session.SessionManager;
 
+/**
+ * Splash screen launcher activity.
+ *
+ * Exclusively performs Version Check and dynamic Base URL discovery from server.
+ * Saves dynamic Base URL in Local DB (SharedPreferences) for application-wide use.
+ *
+ * NOTE: Token generation is NOT performed on Splash. It is invoked post OTP verification.
+ */
 public class SplashActivity extends AppCompatActivity {
 
-    private static final String TAG = "SplashActivity";
+    private static final String TAG = "sParking_FLOW";
 
     private ProgressBar progressBar;
     private TextView tvStatus;
     private MaterialButton btnRetry;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private TokenManager tokenManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,24 +48,32 @@ public class SplashActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_splash);
 
-        // Configure edge-to-edge with light status bar icons for dark royal background
+        // Configure edge-to-edge status bar
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         if (controller != null) {
             controller.setAppearanceLightStatusBars(false);
             controller.setAppearanceLightNavigationBars(false);
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.splash_root), (v, insets) -> {
+        View rootView = findViewById(R.id.splash_root);
+        if (rootView == null) {
+            rootView = findViewById(android.R.id.content);
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
 
-        tokenManager = TokenManager.getInstance(this);
+        // Initialize Dynamic API Configuration & Cache from Local DB
+        ApiConfig.init(this);
 
         initViews();
         startEntranceAnimation();
-        checkTokenAndProceed();
+
+        // Launch Version Check Flow
+        startVersionCheckFlow();
     }
 
     private void initViews() {
@@ -63,7 +81,7 @@ public class SplashActivity extends AppCompatActivity {
         tvStatus = findViewById(R.id.tv_status);
         btnRetry = findViewById(R.id.btn_retry);
 
-        btnRetry.setOnClickListener(v -> checkTokenAndProceed());
+        btnRetry.setOnClickListener(v -> startVersionCheckFlow());
     }
 
     /**
@@ -133,55 +151,108 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     /**
-     * Checks if existing token is valid. Reuses existing token if not expired.
-     * Only fetches a fresh token when expired or missing.
+     * Step 1: Queries VersionCheck API dynamically.
+     * Enforces app update if lower version, checks expiry, and updates dynamic base URL in Local DB.
      */
-    private void checkTokenAndProceed() {
+    private void startVersionCheckFlow() {
         progressBar.setVisibility(View.VISIBLE);
         btnRetry.setVisibility(View.GONE);
+        tvStatus.setText("Verifying app version & server configuration...");
 
-        if (tokenManager.isTokenValid()) {
-            Log.i(TAG, "Existing token is valid! Skipping generate_token. Valid until: " + tokenManager.getExpiresAt());
-            tvStatus.setText("Session verified. Launching...");
-            handler.postDelayed(this::navigateToNextScreen, 1200);
-        } else {
-            Log.i(TAG, "Token is expired or not found. Fetching fresh token from server...");
-            fetchFreshAuthToken();
-        }
-    }
+        Log.i(TAG, "================================================================================");
+        Log.i(TAG, "🚀 [sParking_FLOW] Splash screen started. Checking server version...");
+        Log.i(TAG, "🌐 Active Mode: " + (ApiConfig.isProduction() ? "PRODUCTION [AES-256-GCM]" : "STAGING [Plain Real Data]"));
+        Log.i(TAG, "📡 Initial Active Base URL: " + ApiConfig.getBaseUrl());
+        Log.i(TAG, "================================================================================");
 
-    private void fetchFreshAuthToken() {
-        tvStatus.setText("Establishing secure POS session...");
-
-        AuthNetworkService.generateToken(new AuthNetworkService.TokenCallback() {
+        VersionCheckService.checkVersion(this, new VersionCheckService.VersionCheckCallback() {
             @Override
-            public void onSuccess(String accessToken, String createdAt, String expiresAt, String message) {
-                Log.d(TAG, "Fresh token received: " + accessToken);
+            public void onSuccess(VersionCheckService.VersionCheckResult result) {
+                Log.i(TAG, "================================================================================");
+                Log.i(TAG, "✅ [sParking_FLOW] Version Check Result: " + result);
 
-                tokenManager.saveToken(accessToken, createdAt, expiresAt);
+                // 1. Force update check if installed version is lower than ServerVersion
+                if (result.isLowerVersion()) {
+                    Log.w(TAG, "⚠️ [sParking_FLOW] Lower Version detected! Required: " + result.getServerVersion());
+                    progressBar.setVisibility(View.GONE);
+                    showUpdateRequiredDialog(result.getServerVersion());
+                    return;
+                }
 
-                tvStatus.setText("Session established. Launching...");
-                handler.postDelayed(SplashActivity.this::navigateToNextScreen, 1200);
+                // 2. Build expiry check if valid_upto is provided
+                if (result.isBuildExpired()) {
+                    Log.w(TAG, "⚠️ [sParking_FLOW] Build Expired on: " + result.getValidUpto());
+                    progressBar.setVisibility(View.GONE);
+                    showBuildExpiredDialog();
+                    return;
+                }
+
+                // 3. Dynamic Base URL update for Higher/Equal versions
+                if (result.hasBaseUrl()) {
+                    Log.i(TAG, "🔗 [sParking_FLOW] Dynamic Base URL from server: " + result.getBaseUrl());
+                    ApiConfig.setBaseUrl(SplashActivity.this, result.getBaseUrl());
+                }
+
+                Log.i(TAG, "================================================================================");
+                tvStatus.setText("Configuration verified. Launching...");
+                navigateToNextScreen();
             }
 
             @Override
             public void onFailure(String errorMessage) {
-                Log.e(TAG, "Failed to get token: " + errorMessage);
-                progressBar.setVisibility(View.GONE);
-                btnRetry.setVisibility(View.VISIBLE);
-                tvStatus.setText("Authentication failed:\n" + errorMessage);
-                Toast.makeText(SplashActivity.this, "Unable to generate session token", Toast.LENGTH_SHORT).show();
+                Log.w(TAG, "⚠️ [sParking_FLOW] VersionCheck failed: " + errorMessage + ". Proceeding with cached configuration: " + ApiConfig.getBaseUrl());
+                tvStatus.setText("Launching with cached configuration...");
+                navigateToNextScreen();
             }
         });
     }
 
+    private void showUpdateRequiredDialog(String serverVersion) {
+        String versionDisplay = (serverVersion != null && !serverVersion.isEmpty()) ? serverVersion : "latest";
+        new AlertDialog.Builder(this)
+                .setTitle("Update Required")
+                .setMessage("A new version (" + versionDisplay + ") of S-Parking is available. Please update the app from the Play Store to continue.")
+                .setCancelable(false)
+                .setPositiveButton("Update Now", (dialog, which) -> {
+                    String packageName = getPackageName();
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + packageName)));
+                    } catch (Exception e) {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=" + packageName)));
+                    }
+                    finish();
+                })
+                .show();
+    }
+
+    private void showBuildExpiredDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Build Expired")
+                .setMessage("This build has expired. Please install the latest official release.")
+                .setCancelable(false)
+                .setPositiveButton("Close App", (dialog, which) -> finish())
+                .show();
+    }
+
+    /**
+     * Navigates directly to MainActivity (if user is already logged in) or LoginActivity.
+     * Token generation will be called during/after OTP validation or login, NOT on Splash!
+     */
     private void navigateToNextScreen() {
-        Class<?> targetActivity = SessionManager.getInstance(SplashActivity.this).isLoggedIn()
-                ? MainActivity.class
-                : LoginActivity.class;
-        Intent intent = new Intent(SplashActivity.this, targetActivity);
-        startActivity(intent);
-        finish();
+        boolean isLoggedIn = SessionManager.getInstance(SplashActivity.this).isLoggedIn();
+        Class<?> targetActivity = isLoggedIn ? MainActivity.class : LoginActivity.class;
+
+        Log.i(TAG, "================================================================================");
+        Log.i(TAG, "🎯 [sParking_FLOW] Navigating from Splash -> " + targetActivity.getSimpleName());
+        Log.i(TAG, "👤 User Session Logged In: " + isLoggedIn);
+        Log.i(TAG, "🔑 Note: Token generation deferred to post-OTP verification flow.");
+        Log.i(TAG, "================================================================================");
+
+        handler.postDelayed(() -> {
+            Intent intent = new Intent(SplashActivity.this, targetActivity);
+            startActivity(intent);
+            finish();
+        }, 1000);
     }
 
     @Override

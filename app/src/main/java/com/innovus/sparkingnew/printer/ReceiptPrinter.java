@@ -39,6 +39,10 @@ public class ReceiptPrinter {
 
     // Stored callback for EzeAPI path — called from onActivityResult, NOT immediately
     private static PrintCallback pendingEzeCallback = null;
+    
+    public static void setPendingEzeCallback(PrintCallback callback) {
+        pendingEzeCallback = callback;
+    }
 
     public interface PrintCallback {
         void onComplete(boolean success, String statusMessage);
@@ -123,21 +127,14 @@ public class ReceiptPrinter {
                 if (paxPrinter.isPrinterAvailable()) {
                     Log.i(TAG, "PAX Neptune printer detected. Starting print...");
                     printOnPax(activity, paxPrinter, finalVehicle, finalTime, finalBooking, finalType, finalLoc, finalSlot, callback, mainHandler);
-                    return;
-                }
-
-                // Check 2: PineLabs / EzeAPI POS terminal
-                Log.i(TAG, "PAX not detected. Attempting print via PineLabs / EzeAPI...");
-                mainHandler.post(() -> {
-                    try {
-                        printOnEzeApi(activity, finalVehicle, finalTime, finalBooking, finalType, finalLoc, finalSlot, callback);
-                    } catch (Throwable t) {
-                        Log.e(TAG, "Error invoking EzeAPI printing: " + t.getMessage(), t);
+                } else {
+                    Log.e(TAG, "PAX Neptune printer NOT detected. This device is not PAX.");
+                    mainHandler.post(() -> {
                         String msg = "Thermal printer not detected on this device";
                         Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
                         if (callback != null) callback.onComplete(false, msg);
-                    }
-                });
+                    });
+                }
 
             } catch (Throwable t) {
                 Log.e(TAG, "Printer detection failed: " + t.getMessage(), t);
@@ -176,6 +173,9 @@ public class ReceiptPrinter {
                 printBill.append(PrinterUtils.paddingCenter("sParking", PrinterUtils.PAGE_WIDTH_TWO_INCH)).append("\n");
                 printer.printStr(printBill.toString(), null);
                 printer.step(2);
+
+                // Reset font for subheaders
+                printer.fontSet(EFontTypeAscii.FONT_8_32, EFontTypeExtCode.FONT_16_32);
 
                 printBill = new StringBuilder();
                 printBill.append(PrinterUtils.paddingCenter("www.s-parking.com", PrinterUtils.PAGE_WIDTH_TWO_INCH_SMALL)).append("\n");
@@ -244,26 +244,11 @@ public class ReceiptPrinter {
 
             } catch (Throwable e) {
                 Log.e(TAG, "PAX Printing failed: " + e.getMessage(), e);
-                if (e instanceof UnsatisfiedLinkError || e instanceof NoClassDefFoundError) {
-                    mainHandler.post(() -> {
-                        try {
-                            Log.i(TAG, "Non-PAX hardware: Switching to EzeAPI fallback...");
-                            printOnEzeApi(activity, vehicleNumber, checkInTime, bookingNumber,
-                                    vehicleType, parkingLocation, slotName, callback);
-                        } catch (Throwable t2) {
-                            Log.e(TAG, "EzeAPI fallback also failed: " + t2.getMessage());
-                            String msg = "Printer not available on this device";
-                            Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
-                            if (callback != null) callback.onComplete(false, msg);
-                        }
-                    });
-                } else {
-                    mainHandler.post(() -> {
-                        String msg = "Printer: " + (e.getMessage() != null ? e.getMessage() : "Print error");
-                        Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
-                        if (callback != null) callback.onComplete(false, msg);
-                    });
-                }
+                mainHandler.post(() -> {
+                    String msg = "Printer: " + (e.getMessage() != null ? e.getMessage() : "Print error");
+                    Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
+                    if (callback != null) callback.onComplete(false, msg);
+                });
             }
         }).start();
     }
@@ -272,7 +257,7 @@ public class ReceiptPrinter {
      * Prints ticket using PineLabs / Verifone EzeAPI by drawing a canvas bitmap and invoking EzeAPI.printBitmap.
      * Ported directly from SParkingAgent's VehicleInfoScanActivity.printEazytapBillNew()
      */
-    private static void printOnEzeApi(Activity activity,
+    public static void printOnEzeApi(Activity activity,
                                       String vehicleNumber,
                                       String checkInTime,
                                       String bookingNumber,
@@ -449,20 +434,14 @@ public class ReceiptPrinter {
                 if (paxPrinter.isPrinterAvailable()) {
                     Log.i(TAG, "PAX Neptune printer detected for checkout print...");
                     printCheckOutOnPax(activity, paxPrinter, finalVehicle, finalInTime, finalOutTime, finalBooking, finalType, finalLoc, finalSlot, totalHours, hourlyRate, totalAmount, finalMode, finalTxn, callback, mainHandler);
-                    return;
-                }
-
-                Log.i(TAG, "PAX not detected. Attempting checkout print via PineLabs / EzeAPI...");
-                mainHandler.post(() -> {
-                    try {
-                        printCheckOutOnEzeApi(activity, finalVehicle, finalInTime, finalOutTime, finalBooking, finalType, finalLoc, finalSlot, totalHours, hourlyRate, totalAmount, finalMode, finalTxn, callback);
-                    } catch (Throwable t) {
-                        Log.e(TAG, "Error invoking EzeAPI checkout printing: " + t.getMessage(), t);
+                } else {
+                    Log.e(TAG, "PAX Neptune printer NOT detected. This device is not PAX.");
+                    mainHandler.post(() -> {
                         String msg = "Thermal printer not detected on this device";
                         Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
                         if (callback != null) callback.onComplete(false, msg);
-                    }
-                });
+                    });
+                }
 
             } catch (Throwable t) {
                 Log.e(TAG, "Checkout printer detection failed: " + t.getMessage(), t);
@@ -555,6 +534,9 @@ public class ReceiptPrinter {
                 printer.printStr(printBill.toString(), null);
                 printer.step(2);
 
+                // Reset font for subheaders
+                printer.fontSet(EFontTypeAscii.FONT_8_32, EFontTypeExtCode.FONT_16_32);
+
                 // 2. Parking Maintenance Charge (Center)
                 printBill = new StringBuilder();
                 printBill.append(PrinterUtils.paddingCenter("Parking Maintenance Charge", PrinterUtils.PAGE_WIDTH_TWO_INCH_SMALL)).append("\n");
@@ -612,22 +594,11 @@ public class ReceiptPrinter {
 
             } catch (Throwable t) {
                 Log.e(TAG, "PAX Checkout printing failed: " + t.getMessage(), t);
-                if (t instanceof UnsatisfiedLinkError || t instanceof NoClassDefFoundError) {
-                    mainHandler.post(() -> {
-                        try {
-                            Log.i(TAG, "Non-PAX hardware: Switching to EzeAPI checkout fallback...");
-                            printCheckOutOnEzeApi(activity, vehicleNumber, inTime, outTime, bookingNumber, vehicleType, parkingLocation, slotName, totalHours, hourlyRate, totalAmount, paymentModeName, transactionId, callback);
-                        } catch (Throwable ezeErr) {
-                            if (callback != null) callback.onComplete(false, "Printing error: " + t.getMessage());
-                        }
-                    });
-                } else {
-                    mainHandler.post(() -> {
-                        String msg = "Printer: " + (t.getMessage() != null ? t.getMessage() : "Print error");
-                        Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
-                        if (callback != null) callback.onComplete(false, msg);
-                    });
-                }
+                mainHandler.post(() -> {
+                    String msg = "Printer: " + (t.getMessage() != null ? t.getMessage() : "Print error");
+                    Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
+                    if (callback != null) callback.onComplete(false, msg);
+                });
             }
         }).start();
     }
@@ -636,7 +607,7 @@ public class ReceiptPrinter {
      * Prints checkout tax invoice ticket via PineLabs / EzeAPI POS terminal bitmap printing.
      * Formatted line-by-line identical to SParkingAgent (BillGenerateActivity.printEazytapBillNew).
      */
-    private static void printCheckOutOnEzeApi(Activity activity,
+    public static void printCheckOutOnEzeApi(Activity activity,
                                              String vehicleNumber,
                                              String inTime,
                                              String outTime,

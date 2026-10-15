@@ -66,7 +66,7 @@ public class LoginNetworkService {
                 innerObj.put("device_id", deviceId != null ? deviceId : "");
 
                 String payload = CryptoManager.prepareEncryptedPayload(innerObj);
-                Log.i(TAG, "[REQUEST PAYLOAD] " + payload);
+                Log.i(TAG, "[REQUEST PAYLOAD] Prepared (" + (ApiConfig.isProduction() ? "AES-256-GCM Encrypted" : "Staging Mode") + ", " + payload.length() + " bytes)");
 
                 // STEP 2: Configure Connection
                 URL url = new URL(loginUrl);
@@ -111,7 +111,7 @@ public class LoginNetworkService {
                 }
 
                 String responseStr = responseBuilder.toString();
-                Log.i(TAG, "[RAW SERVER RESPONSE] " + responseStr);
+                Log.i(TAG, "[RAW SERVER RESPONSE] Received (" + responseStr.length() + " bytes)");
 
                 // Parse Backend Response JSON (auto decrypt and check all known message keys)
                 JSONObject responseJson = ApiResponseHelper.parseAndDecryptResponse(responseStr);
@@ -121,16 +121,31 @@ public class LoginNetworkService {
 
                     if ("GEN_000".equalsIgnoreCase(status) || "SUCCESS".equalsIgnoreCase(status)) {
                         Log.i(TAG, "[LOGIN SUCCESS] " + backendMessage);
-                        String rawData = responseJson.optString("data", "");
                         UserData userData = null;
+                        String rawDataStr = "";
 
-                        if (!rawData.isEmpty() && !rawData.equals("null")) {
-                            JSONObject userJson = new JSONObject(rawData);
-                            userData = UserData.fromJson(userJson);
+                        if (responseJson.has("data")) {
+                            Object dataObj = responseJson.get("data");
+                            if (dataObj instanceof JSONObject) {
+                                JSONObject userJson = (JSONObject) dataObj;
+                                userData = UserData.fromJson(userJson);
+                                rawDataStr = userJson.toString();
+                            } else if (dataObj instanceof String) {
+                                String str = (String) dataObj;
+                                rawDataStr = str;
+                                if (!str.trim().isEmpty() && !str.equals("null")) {
+                                    try {
+                                        JSONObject userJson = new JSONObject(str);
+                                        userData = UserData.fromJson(userJson);
+                                    } catch (Exception ignored) {
+                                    }
+                                }
+                            }
                         }
 
                         UserData finalUserData = userData;
-                        mainHandler.post(() -> callback.onSuccess(finalUserData, rawData, backendMessage));
+                        String finalRawData = rawDataStr;
+                        mainHandler.post(() -> callback.onSuccess(finalUserData, finalRawData, backendMessage));
                         Log.i(TAG, "==================== [LOGIN REQUEST COMPLETE: OK] ====================");
                         return;
                     } else {

@@ -79,4 +79,6 @@ public class UserData implements Serializable {
     public int getFreeParkingFacility() { return freeParkingFacility; }
     public int getIsSpecialPassAvailable() { return isSpecialPassAvailable; }
     public String getAgencyGstNo() { return agencyGstNo != null ? agencyGstNo : ""; }
+
+
 }

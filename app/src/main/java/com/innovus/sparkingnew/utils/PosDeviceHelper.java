@@ -21,6 +21,7 @@ public class PosDeviceHelper {
      * Get the device identifier for POS API requests.
      * Automatically retrieves serial number on Pax A910s, with fallback to default "27".
      */
+
     public static synchronized String getDeviceId(Context context) {
         if (cachedDeviceId != null && !cachedDeviceId.trim().isEmpty()) {
             return cachedDeviceId;
@@ -28,7 +29,7 @@ public class PosDeviceHelper {
 
         String detectedId = "";
 
-        // 1. Try Pax / Android System Properties
+        //  Try Pax / Android System Properties
         detectedId = getSystemProperty("ro.serialno");
         if (isValidId(detectedId)) {
             Log.i(TAG, "Detected Device ID from ro.serialno: " + detectedId);
@@ -38,7 +39,7 @@ public class PosDeviceHelper {
 
         detectedId = getSystemProperty("ro.boot.serialno");
         if (isValidId(detectedId)) {
-            Log.i(TAG, "Detected Device ID from ro.boot.serialno: " + detectedId);
+            Log.i(TAG, "Detected Device ID from ro.boot.serialno:" + detectedId);
             cachedDeviceId = detectedId;
             return cachedDeviceId;
         }
@@ -90,6 +91,7 @@ public class PosDeviceHelper {
         String model = Build.MODEL != null ? Build.MODEL : "POS Terminal";
         return model + " • ID: " + id;
     }
+
 
     private static boolean isValidId(String str) {
         return str != null && !str.trim().isEmpty() && !str.equalsIgnoreCase("unknown") && !str.equalsIgnoreCase("null");

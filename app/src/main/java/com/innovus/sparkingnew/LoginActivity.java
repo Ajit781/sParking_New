@@ -119,9 +119,7 @@ public class LoginActivity extends AppCompatActivity {
             Log.i(TAG, "Request Code: 10001");
             Log.i(TAG, "App Mode: " + jsonRequest.optString("appMode"));
             Log.i(TAG, "Merchant Name: " + jsonRequest.optString("merchantName"));
-            Log.i(TAG, "User Name: " + jsonRequest.optString("userName"));
-            Log.i(TAG, "App Key: " + (jsonRequest.has("demoAppKey") ? jsonRequest.optString("demoAppKey") : jsonRequest.optString("prodAppKey")));
-            Log.i(TAG, "Full JSON Payload:\n" + jsonRequest.toString(2));
+            Log.i(TAG, "EzeAPI initialized successfully.");
             Log.i(TAG, "======================================================================");
 
             EzeAPI.initialize(this, 10001, jsonRequest);
@@ -233,7 +231,7 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         String bearerToken = tokenManager.getToken();
-        Log.d(TAG, "Performing login -> Username: " + username + ", DeviceID: " + detectedDeviceId);
+        Log.d(TAG, "Performing login -> DeviceID: " + detectedDeviceId);
 
         LoginNetworkService.executeLogin(username, password, "0020797790", bearerToken, new LoginNetworkService.LoginCallback() {
             @Override
@@ -358,9 +356,38 @@ public class LoginActivity extends AppCompatActivity {
         layoutLoginDetails.setVisibility(View.VISIBLE);
 
         pbRedirectBar.setVisibility(View.VISIBLE);
-        tvRedirectHint.setText("Redirecting...");
-        btnDialogContinue.setVisibility(View.VISIBLE);
+        tvRedirectHint.setText("Generating session token...");
+        btnDialogContinue.setVisibility(View.GONE);
 
+        Log.i("sParking_API", "================================================================================");
+        Log.i("sParking_API", "🔑 [sParking_API] LOGIN SUCCESSFUL -> INITIATING TOKEN GENERATION NOW");
+        Log.i("sParking_API", "================================================================================");
+
+        AuthNetworkService.generateToken(new AuthNetworkService.TokenCallback() {
+            @Override
+            public void onSuccess(String accessToken, String createdAt, String expiresAt, String msg) {
+                Log.i("sParking_API", "================================================================================");
+                Log.i("sParking_API", "✅ [sParking_API] TOKEN GENERATED POST-LOGIN!");
+                Log.i("sParking_API", "🔑 Session token cached securely in Local DB (SharedPreferences).");
+                Log.i("sParking_API", "📅 Expires At: " + expiresAt);
+                Log.i("sParking_API", "================================================================================");
+                tokenManager.saveToken(accessToken, createdAt, expiresAt);
+                tvRedirectHint.setText("Session ready. Redirecting...");
+                btnDialogContinue.setVisibility(View.VISIBLE);
+                scheduleNavigationToMain(userData);
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                Log.w("sParking_API", "⚠️ [sParking_API] Post-login token generation failed: " + errorMessage + " (Will auto-retry on next API request)");
+                tvRedirectHint.setText("Redirecting...");
+                btnDialogContinue.setVisibility(View.VISIBLE);
+                scheduleNavigationToMain(userData);
+            }
+        });
+    }
+
+    private void scheduleNavigationToMain(UserData userData) {
         navigateRunnable = () -> {
             dismissLoginDialog();
             if (!isFinishing() && !isDestroyed()) {
@@ -377,7 +404,7 @@ public class LoginActivity extends AppCompatActivity {
             navigationHandler.removeCallbacksAndMessages(null);
         }
 
-        navigationHandler.postDelayed(navigateRunnable, 1100);
+        navigationHandler.postDelayed(navigateRunnable, 800);
 
         btnDialogContinue.setOnClickListener(v -> {
             if (navigationHandler != null && navigateRunnable != null) {
